@@ -1,0 +1,54 @@
+<button id="serve">serve</button>
+<p>request:</p>
+<textarea id="request" cols="60" rows="6"></textarea>
+<p>response:</p>
+<textarea id="response" cols="60" rows="6">HTTP/1.1 200 OK
+Content-Length: 12
+
+hello world
+
+</textarea>
+<button id="respond" disabled>respond!</button>
+
+<script type="module">
+
+window.serve.onclick = () => {
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+let controller = null;
+const stream = new ReadableStream({
+  start(_controller) { controller = _controller },
+});
+
+fetch("http://localhost:8000", {
+  method: "POST",
+  body: stream,
+  allowHTTP1ForStreamingUpload: true,
+});
+
+(async () => {
+
+await new Promise(resolve => setTimeout(resolve, 100));
+
+const res = await fetch('http://localhost:8000');
+const reader = res.body.getReader();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const text = decoder.decode(value);
+  window.request.value += text;
+  if (text.endsWith('\r\n\r\n')) {
+    window.respond.disabled = false;
+    window.respond.onclick = () => {
+      controller.enqueue(encoder.encode(window.response.value));
+    };
+  }
+}
+
+})();
+
+};
+</script>
